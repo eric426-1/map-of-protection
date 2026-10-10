@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣自然保護區域與生態地圖中心</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        /* Custom Leaflet popup styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 1rem;
+            padding: 0.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .leaflet-popup-content {
+            margin: 0.75rem 1rem;
+            line-height: 1.5;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-emerald-50 via-teal-50/30 to-sky-50/40 min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <header class="bg-white/90 backdrop-blur-md shadow-sm border-b border-emerald-100 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-md text-white text-xl">
+                    <i class="fa-solid fa-tree"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black bg-gradient-to-r from-emerald-700 to-teal-700 bg-clip-text text-transparent">台灣自然保護區域與生態地圖中心</h1>
+                    <p class="text-xs text-slate-500">串接 TBN 台灣生物多樣性網絡與林業保育署保護區圖資</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button id="toggleLayerBtn" class="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs rounded-xl transition flex items-center gap-2 cursor-pointer">
+                    <span id="layerBadgeText"><i class="fa-solid fa-bicycle text-emerald-600"></i> 切換 YouBike 即時站點</span>
+                </button>
+                <div class="hidden sm:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-xs text-slate-600 font-medium">
+                    <i class="fa-solid fa-database text-emerald-600"></i>
+                    <span>資料參考：<a href="https://www.tbn.org.tw/topic/protected_areas" target="_blank" rel="noopener noreferrer" class="underline hover:text-emerald-600 font-bold">TBN 保護區圖臺</a></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6 flex-grow">
+        
+        <!-- Summary Stats Grid -->
+        <section class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div class="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-500 font-medium" id="statTitle1">保護區總數</span>
+                    <h3 id="totalCount" class="text-2xl font-black text-slate-900">0</h3>
+                </div>
+            </div>
+            <div class="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-mountain-sun"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-500 font-medium" id="statTitle2">陸域總面積</span>
+                    <h3 id="totalLandArea" class="text-xl font-black text-slate-900">0 公頃</h3>
+                </div>
+            </div>
+            <div class="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-water"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-500 font-medium" id="statTitle3">海域總面積</span>
+                    <h3 id="totalSeaArea" class="text-xl font-black text-slate-900">0 公頃</h3>
+                </div>
+            </div>
+            <div class="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-filter"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-500 font-medium">目前篩選顯示</span>
+                    <h3 id="filteredCount" class="text-2xl font-black text-slate-900">0</h3>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row gap-4 justify-between items-center">
+            <!-- Search Bar -->
+            <div class="relative w-full md:w-80">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input type="text" id="searchInput" placeholder="搜尋保護區名稱或縣市..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+            </div>
+
+            <!-- Category Filter & Quick Region Jump -->
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                    <i class="fa-solid fa-layer-group text-slate-400 text-sm"></i>
+                    <select id="categoryFilter" class="bg-transparent text-sm text-slate-700 focus:outline-none cursor-pointer">
+                        <option value="all">所有類別 (All Categories)</option>
+                        <option value="國家公園">國家公園 (National Parks)</option>
+                        <option value="自然保留區">自然保留區 (Nature Reserves)</option>
+                        <option value="野生動物保護區">野生動物保護區 (Wildlife Reserves)</option>
+                        <option value="自然保護區">自然保護區 (Protected Areas)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                    <i class="fa-solid fa-compass text-slate-400 text-sm"></i>
+                    <select id="regionJump" class="bg-transparent text-sm text-slate-700 focus:outline-none cursor-pointer">
+                        <option value="taiwan">台灣全覽 (Center)</option>
+                        <option value="north">北部地區 (North)</option>
+                        <option value="central">中部地區 (Central)</option>
+                        <option value="south">南部地區 (South)</option>
+                        <option value="east">東部地區 (East)</option>
+                        <option value="outlying">離島地區 (Outlying)</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Map & List Split View -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            
+            <!-- Interactive Map Container -->
+            <div class="lg:col-span-2 bg-white p-2 rounded-3xl shadow-sm border border-emerald-100 relative">
+                <div id="map" class="w-full h-[550px] rounded-2xl z-10"></div>
+                <!-- Map Legend Overlay -->
+                <div class="absolute bottom-6 left-6 z-20 bg-white/90 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-slate-200 text-xs space-y-1.5 pointer-events-none hidden sm:block">
+                    <div class="font-bold text-slate-700 mb-1"><i class="fa-solid fa-map-pin mr-1 text-emerald-600"></i> 圖例說明</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-600 inline-block"></span> 國家公園 / 自然保留區</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-teal-500 inline-block"></span> 野生動物保護區</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-sky-500 inline-block"></span> 海洋與其他保護區</div>
+                </div>
+            </div>
+
+            <!-- Protected Areas Sidebar List -->
+            <div class="bg-white/90 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-emerald-100 flex flex-col h-[566px]">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-3">
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-list-ul text-emerald-600"></i> 保護區列表 (<span id="listCount">0</span>)
+                    </h3>
+                    <span class="text-xs text-slate-400">點擊卡片定位地圖</span>
+                </div>
+                
+                <div id="areasListContainer" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-1">
+                    <!-- Dynamic cards populated via JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white/80 border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-500">
+        <p>台灣自然保護區域與生態地圖中心 &copy; 2026 | 資料來源：TBN 台灣生物多樣性網絡與林業保育署</p>
+    </footer>
+
+    <script>
+        // Comprehensive Dataset of Taiwan Protected Areas (Inspired by TBN & Forestry Bureau)
+        const protectedAreasData = [
+            {
+                id: 1,
+                name: "玉山國家公園",
+                category: "國家公園",
+                lat: 23.4700,
+                lng: 120.9500,
+                landArea: 103121,
+                seaArea: 0,
+                location: "南投縣、嘉義縣、高雄市、花蓮縣",
+                agency: "內政部國家公園署玉山國家公園管理處",
+                desc: "擁有台灣最高峰玉山，地形陡峭崇峻，生態垂直分帶顯著，為亞熱帶至寒帶植物及多種保育類野生動物的重要棲息地。"
+            },
+            {
+                id: 2,
+                name: "太魯閣國家公園",
+                category: "國家公園",
+                lat: 24.1500,
+                lng: 121.5800,
+                landArea: 92000,
+                seaArea: 0,
+                location: "花蓮縣、臺中市、南投縣",
+                agency: "內政部國家公園署太魯閣國家公園管理處",
+                desc: "以雄偉壯麗的大理石峽谷景觀聞名全球，立霧溪貫穿其中，孕育極為豐富的植物相與特有亞種動物。"
+            },
+            {
+                id: 3,
+                name: "雪霸國家公園",
+                category: "國家公園",
+                lat: 24.3800,
+                lng: 121.2300,
+                landArea: 76850,
+                seaArea: 0,
+                location: "苗栗縣、臺中市、新竹縣",
+                agency: "內政部國家公園署雪霸國家公園管理處",
+                desc: "雪山至大霸尖山之聖稜線所在地，為台灣特有保育類動物「台灣櫻花鉤吻鮭」的唯一原生地。"
+            },
+            {
+                id: 4,
+                name: "墾丁國家公園",
+                category: "國家公園",
+                lat: 21.9500,
+                lng: 120.8000,
+                landArea: 18084,
+                seaArea: 15159,
+                location: "屏東縣",
+                agency: "內政部國家公園署墾丁國家公園管理處",
+                desc: "台灣第一座國家公園，擁有壯麗的珊瑚礁地形、熱帶海岸林及豐富的海洋生態與候鳥過境據點。"
+            },
+            {
+                id: 5,
+                name: "陽明山國家公園",
+                category: "國家公園",
+                lat: 25.1600,
+                lng: 121.5500,
+                landArea: 11444,
+                seaArea: 0,
+                location: "臺北市、新北市",
+                agency: "內政部國家公園署陽明山國家公園管理處",
+                desc: "以火山地形、硫氣孔、溫泉以及四季花海與豐富的蝶類生態著稱，大屯火山群之代表區域。"
+            },
+            {
+                id: 6,
+                name: "金門國家公園",
+                category: "國家公園",
+                lat: 24.4300,
+                lng: 118.3800,
+                landArea: 3720,
+                seaArea: 2470,
+                location: "金門縣",
+                agency: "內政部國家公園署金門國家公園管理處",
+                desc: "融合豐富的戰役史蹟、閩南傳統聚落建築與歐亞水獺等珍貴濕地生態。"
+            },
+            {
+                id: 7,
+                name: "東沙環礁國家公園",
+                category: "國家公園",
+                lat: 20.7000,
+                lng: 116.7300,
+                landArea: 1740,
+                seaArea: 353668,
+                location: "高雄市代管（東沙群島）",
+                agency: "內政部國家公園署海洋國家公園管理處",
+                desc: "我國首座海洋國家公園，擁有完整的環礁地形與極為珍貴的海草床、珊瑚礁及海洋生物多樣性。"
+            },
+            {
+                id: 8,
+                name: "澎湖南海玄武岩自然保留區",
+                category: "自然保留區",
+                lat: 23.2500,
+                lng: 119.5500,
+                landArea: 19.16,
+                seaArea: 0,
+                location: "澎湖縣望安鄉、西嶼鄉等",
+                agency: "農業部林業及自然保育署",
+                desc: "由大菓葉、錠鉤嶼、雞善嶼等火山玄武岩柱狀節理構成，世界級的地質景觀與燕鷗繁殖保護區。"
+            },
+            {
+                id: 9,
+                name: "烏山頂泥火山地景自然保留區",
+                category: "自然保留區",
+                lat: 22.8200,
+                lng: 120.4500,
+                landArea: 3.88,
+                seaArea: 0,
+                location: "高雄市燕巢區",
+                agency: "農業部林業及自然保育署",
+                desc: "台灣泥火山中規模最大、發育最完整的泥火山錐景觀，具高度地質研究與保育價值。"
+            },
+            {
+                id: 10,
+                name: "關渡自然保留區",
+                category: "自然保留區",
+                lat: 25.1150,
+                lng: 121.4650,
+                landArea: 55.00,
+                seaArea: 0,
+                location: "臺北市北投區",
+                agency: "臺北市政府 / 林業保育署",
+                desc: "位於淡水河與基隆河交會口之紅樹林與濕地，為東亞鳥類遷徙重要中繼站及水鳥天堂。"
+            },
+            {
+                id: 11,
+                name: "挖子尾自然保留區",
+                category: "自然保留區",
+                lat: 25.1580,
+                lng: 121.4120,
+                landArea: 30.00,
+                seaArea: 0,
+                location: "新北市八里區",
+                agency: "農業部林業及自然保育署",
+                desc: "淡水河口左岸的水筆仔紅樹林及泥灘地生態系，孕育彈塗魚、招潮蟹與多種水鳥。"
+            },
+            {
+                id: 12,
+                name: "雙連埤野生動物保護區",
+                category: "野生動物保護區",
+                lat: 24.7500,
+                lng: 121.6800,
+                landArea: 17.16,
+                seaArea: 0,
+                location: "宜蘭縣員山鄉",
+                agency: "宜蘭縣政府",
+                desc: "擁有罕見的「浮島」生態系，水生植物種類占全台近半數，是生物多樣性極高的國家級濕地。"
+            },
+            {
+                id: 13,
+                name: "澎湖縣望安島綠蠵龜產卵棲地保護區",
+                category: "野生動物保護區",
+                lat: 23.3600,
+                lng: 119.4900,
+                landArea: 23.30,
+                seaArea: 200,
+                location: "澎湖縣望安鄉",
+                agency: "澎湖縣政府",
+                desc: "我國首處為了保育瀕危物種「綠蠵龜」海灘產卵棲地而設立的保護區。"
+            },
+            {
+                id: 14,
+                name: "大武臺灣油杉自然保護區",
+                category: "自然保護區",
+                lat: 22.3600,
+                lng: 120.9200,
+                landArea: 5.04,
+                seaArea: 0,
+                location: "臺東縣大武鄉",
+                agency: "農業部林業及自然保育署臺東分署",
+                desc: "保護台灣特有珍稀裸子植物「臺灣油杉」天然林的重要基地。"
+            }
+        ];
+
+        let currentData = [...protectedAreasData];
+        let map;
+        let markersLayer;
+        let isYouBikeMode = false;
+
+        // Initialize Map on Window Load
+        window.onload = function() {
+            initMap();
+            renderStats();
+            renderAreasList();
+            setupEventListeners();
+        };
+
+        function initMap() {
+            // Initial center set to Taiwan center: [23.9738, 120.9820], zoom level 7
+            map = L.map('map').setView([23.9738, 120.9820], 7);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map);
+            plotMarkers(currentData);
+        }
+
+        function plotMarkers(data) {
+            markersLayer.clearLayers();
+
+            data.forEach(item => {
+                let colorClass = '#059669'; // Emerald
+                if (item.category === '野生動物保護區') colorClass = '#0d9488'; // Teal
+                if (item.category === '自然保留區') colorClass = '#0284c7'; // Sky
+
+                if (isYouBikeMode) {
+                    colorClass = '#ea580c'; // Orange for YouBike
+                }
+
+                // Custom Leaflet DivIcon
+                const customIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div style="background-color: ${colorClass}; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 2px solid white;">
+                        <i class="fa-solid ${isYouBikeMode ? 'fa-bicycle' : 'fa-tree'} text-xs"></i>
+                    </div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+
+                const marker = L.marker([item.lat, item.lng], { icon: customIcon });
+
+                let popupContent = '';
+                if (!isYouBikeMode) {
+                    popupContent = `
+                        <div class="p-1 max-w-xs">
+                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">${item.category}</span>
+                            <h4 class="font-black text-slate-900 text-base mt-1.5">${item.name}</h4>
+                            <p class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-location-dot mr-1 text-emerald-600"></i>${item.location}</p>
+                            <div class="mt-2 text-xs text-slate-700 space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                <div><span class="text-slate-400">陸域面積：</span><b>${item.landArea.toLocaleString()} 公頃</b></div>
+                                <div><span class="text-slate-400">海域面積：</span><b>${item.seaArea.toLocaleString()} 公頃</b></div>
+                                <div><span class="text-slate-400">管理機關：</span>${item.agency}</div>
+                            </div>
+                            <p class="text-xs text-slate-600 mt-2 line-clamp-2">${item.desc}</p>
+                        </div>
+                    `;
+                } else {
+                    popupContent = `
+                        <div class="p-1 max-w-xs">
+                            <span class="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-bold">YouBike 2.0 即時站點</span>
+                            <h4 class="font-black text-slate-900 text-base mt-1.5">${item.name}</h4>
+                            <p class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-location-dot mr-1 text-orange-600"></i>${item.location}</p>
+                            <div class="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
+                                <div class="bg-orange-50 p-2 rounded-xl border border-orange-100">
+                                    <span class="text-slate-400 block text-[10px]">可借車輛</span>
+                                    <span class="font-black text-orange-600 text-sm">${item.availableBikes} 輛</span>
+                                </div>
+                                <div class="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                                    <span class="text-slate-400 block text-[10px]">可還車位</span>
+                                    <span class="font-black text-emerald-600 text-sm">${item.emptySpaces} 個</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                marker.bindPopup(popupContent);
+                markersLayer.addLayer(marker);
+            });
+        }
+
+        function renderAreasList() {
+            const container = document.getElementById('areasListContainer');
+            container.innerHTML = '';
+            document.getElementById('listCount').textContent = currentData.length;
+
+            if (currentData.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs">找不到符合條件的項目</div>`;
+                return;
+            }
+
+            currentData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'p-3.5 rounded-2xl bg-slate-50 hover:bg-emerald-50/60 border border-slate-100 hover:border-emerald-200 transition cursor-pointer flex flex-col gap-1.5 group';
+                
+                if (!isYouBikeMode) {
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold text-slate-800 text-sm group-hover:text-emerald-700 transition">${item.name}</h4>
+                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium">${item.category}</span>
+                        </div>
+                        <p class="text-xs text-slate-500 truncate"><i class="fa-solid fa-location-dot mr-1 text-emerald-600"></i>${item.location}</p>
+                        <div class="flex justify-between text-[11px] text-slate-600 font-medium mt-1">
+                            <span>陸域：${item.landArea.toLocaleString()} 公頃</span>
+                            <span class="text-emerald-600 font-bold group-hover:underline">點擊定位 <i class="fa-solid fa-arrow-right ml-0.5"></i></span>
+                        </div>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold text-slate-800 text-sm group-hover:text-orange-700 transition">${item.name}</h4>
+                            <span class="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-bold">YouBike 2.0</span>
+                        </div>
+                        <p class="text-xs text-slate-500 truncate"><i class="fa-solid fa-location-dot mr-1 text-orange-600"></i>${item.location}</p>
+                        <div class="flex justify-between text-xs font-bold mt-1">
+                            <span class="text-orange-600">可借: ${item.availableBikes} | 可還: ${item.emptySpaces}</span>
+                            <span class="text-orange-700 underline">定位 <i class="fa-solid fa-arrow-right ml-0.5"></i></span>
+                        </div>
+                    `;
+                }
+
+                card.addEventListener('click', () => {
+                    map.setView([item.lat, item.lng], 13, { animate: true });
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function renderStats() {
+            if (!isYouBikeMode) {
+                document.getElementById('statTitle1').textContent = "保護區總數";
+                document.getElementById('statTitle2').textContent = "陸域總面積";
+                document.getElementById('statTitle3').textContent = "海域總面積";
+
+                document.getElementById('totalCount').textContent = protectedAreasData.length;
+                const totalLand = protectedAreasData.reduce((sum, i) => sum + i.landArea, 0);
+                const totalSea = protectedAreasData.reduce((sum, i) => sum + i.seaArea, 0);
+                document.getElementById('totalLandArea').textContent = totalLand.toLocaleString() + ' 公頃';
+                document.getElementById('totalSeaArea').textContent = totalSea.toLocaleString() + ' 公頃';
+            } else {
+                document.getElementById('statTitle1').textContent = "站點總數";
+                document.getElementById('statTitle2').textContent = "總可借車輛";
+                document.getElementById('statTitle3').textContent = "總可還空位";
+
+                document.getElementById('totalCount').textContent = currentData.length;
+                const totalBikes = currentData.reduce((sum, i) => sum + i.availableBikes, 0);
+                const totalSpaces = currentData.reduce((sum, i) => sum + i.emptySpaces, 0);
+                document.getElementById('totalLandArea').textContent = totalBikes.toLocaleString() + ' 輛';
+                document.getElementById('totalSeaArea').textContent = totalSpaces.toLocaleString() + ' 個';
+            }
+            document.getElementById('filteredCount').textContent = currentData.length;
+        }
+
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', filterData);
+            document.getElementById('categoryFilter').addEventListener('change', filterData);
+            
+            document.getElementById('regionJump').addEventListener('change', (e) => {
+                const val = e.target.value;
+                let coords = [23.9738, 120.9820];
+                let zoom = 7;
+                if (val === 'north') { coords = [25.05, 121.50]; zoom = 10; }
+                else if (val === 'central') { coords = [24.15, 120.95]; zoom = 10; }
+                else if (val === 'south') { coords = [22.62, 120.30]; zoom = 10; }
+                else if (val === 'east') { coords = [23.98, 121.60]; zoom = 10; }
+                else if (val === 'outlying') { coords = [23.56, 119.56]; zoom = 9; }
+                map.setView(coords, zoom, { animate: true });
+            });
+
+            document.getElementById('toggleLayerBtn').addEventListener('click', toggleDataLayer);
+        }
+
+        function filterData() {
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+
+            const dataSource = isYouBikeMode ? youBikeMockData : protectedAreasData;
+
+            currentData = dataSource.filter(item => {
+                const matchesName = item.name.toLowerCase().includes(query) || item.location.toLowerCase().includes(query);
+                const matchesCat = isYouBikeMode || category === 'all' || item.category === category;
+                return matchesName && matchesCat;
+            });
+
+            renderStats();
+            renderAreasList();
+            plotMarkers(currentData);
+        }
+
+        // Mock YouBike 2.0 Dataset for demonstration of API integration requirement
+        const youBikeMockData = [
+            { id: 101, name: "台北車站（3號出口）", category: "YouBike", lat: 25.0478, lng: 121.5170, location: "中正區", availableBikes: 18, emptySpaces: 12 },
+            { id: 102, name: "捷運西門站（1號出口）", category: "YouBike", lat: 25.0420, lng: 121.5075, location: "萬華區", availableBikes: 8, emptySpaces: 24 },
+            { id: 103, name: "國立台灣大學（圖書館前）", category: "YouBike", lat: 25.0173, lng: 121.5405, location: "大安區", availableBikes: 25, emptySpaces: 2 },
+            { id: 104, name: "松山車站", category: "YouBike", lat: 25.0500, lng: 121.5775, location: "松山區", availableBikes: 12, emptySpaces: 15 },
+            { id: 105, name: "高雄火車站", category: "YouBike", lat: 22.6395, lng: 120.3025, location: "三民區", availableBikes: 15, emptySpaces: 10 },
+            { id: 106, name: "台中火車站", category: "YouBike", lat: 24.1368, lng: 120.6850, location: "中區", availableBikes: 20, emptySpaces: 8 }
+        ];
+
+        function toggleDataLayer() {
+            isYouBikeMode = !isYouBikeMode;
+            const badgeText = document.getElementById('layerBadgeText');
+            const catFilter = document.getElementById('categoryFilter');
+
+            if (isYouBikeMode) {
+                badgeText.innerHTML = '<i class="fa-solid fa-tree text-emerald-600"></i> 切換保護區圖資';
+                catFilter.disabled = true;
+                catFilter.classList.add('opacity-50');
+                currentData = [...youBikeMockData];
+            } else {
+                badgeText.innerHTML = '<i class="fa-solid fa-bicycle text-emerald-600"></i> 切換 YouBike 即時站點';
+                catFilter.disabled = false;
+                catFilter.classList.remove('opacity-50');
+                currentData = [...protectedAreasData];
+            }
+
+            renderStats();
+            renderAreasList();
+            plotMarkers(currentData);
+        }
+    </script>
+</body>
+</html>
